@@ -4,10 +4,7 @@ const scale = 8
 const size = 64
 let currentColor = "#FF0000FF"
 
-// create 64x64 pixel grid
 let pixels = Array.from({length:size}, () => Array(size).fill("#FFFFFFFF"))
-
-// draw grid on canvas
 function drawCanvas() {
   for (let y=0;y<size;y++){
     for (let x=0;x<size;x++){
@@ -17,6 +14,26 @@ function drawCanvas() {
   }
 }
 drawCanvas()
+
+// auto-save debounce
+let saveTimeout
+function scheduleSave() {
+  if(saveTimeout) clearTimeout(saveTimeout)
+  saveTimeout = setTimeout(() => {
+    let table={}
+    for(let y=0;y<size;y++){
+      table[y+1]={}
+      for(let x=0;x<size;x++){
+        table[y+1][x+1]=pixels[y][x]
+      }
+    }
+    fetch("/paint/save", {
+      method:"POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(table)
+    })
+  }, 100) // waits 100ms after last draw
+}
 
 // mouse drawing
 let drawing = false
@@ -31,10 +48,11 @@ canvas.addEventListener("mousemove", e => {
   if(x>=0 && y>=0 && x<size && y<size){
     pixels[y][x] = currentColor
     drawCanvas()
+    scheduleSave() // auto-save after every pixel change
   }
 })
 
-// color palette
+// palette
 const paletteColors = ["#FF0000FF","#00FF00FF","#0000FFFF","#FFFFFFFF","#000000FF","#FFFF00FF"]
 const paletteDiv = document.getElementById("palette")
 paletteColors.forEach(c=>{
@@ -45,8 +63,8 @@ paletteColors.forEach(c=>{
   paletteDiv.appendChild(div)
 })
 
-// save function
-document.getElementById("save").addEventListener("click",async ()=>{
+// still keep manual Save button for backup
+document.getElementById("save").addEventListener("click", async ()=>{
   let table={}
   for(let y=0;y<size;y++){
     table[y+1]={}
@@ -59,10 +77,10 @@ document.getElementById("save").addEventListener("click",async ()=>{
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify(table)
   })
-  alert("Saved!")
+  alert("Saved manually!")
 })
 
-// load function
+// load
 document.getElementById("load").addEventListener("click", async ()=>{
   const res = await fetch("/paint/load")
   if(!res.ok){ alert("No save found"); return }
