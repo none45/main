@@ -5,6 +5,7 @@ const size = 64
 let currentColor = "#FF0000FF"
 
 let pixels = Array.from({length:size}, () => Array(size).fill("#FFFFFFFF"))
+
 function drawCanvas() {
   for (let y=0;y<size;y++){
     for (let x=0;x<size;x++){
@@ -15,7 +16,7 @@ function drawCanvas() {
 }
 drawCanvas()
 
-// auto-save debounce
+// debounce save
 let saveTimeout
 function scheduleSave() {
   if(saveTimeout) clearTimeout(saveTimeout)
@@ -32,10 +33,10 @@ function scheduleSave() {
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify(table)
     })
-  }, 100) // waits 100ms after last draw
+  }, 100)
 }
 
-// mouse drawing
+// drawing
 let drawing = false
 canvas.addEventListener("mousedown", e => drawing = true)
 canvas.addEventListener("mouseup", e => drawing = false)
@@ -48,11 +49,11 @@ canvas.addEventListener("mousemove", e => {
   if(x>=0 && y>=0 && x<size && y<size){
     pixels[y][x] = currentColor
     drawCanvas()
-    scheduleSave() // auto-save after every pixel change
+    scheduleSave()
   }
 })
 
-// palette
+// color palette
 const paletteColors = ["#FF0000FF","#00FF00FF","#0000FFFF","#FFFFFFFF","#000000FF","#FFFF00FF"]
 const paletteDiv = document.getElementById("palette")
 paletteColors.forEach(c=>{
@@ -63,7 +64,7 @@ paletteColors.forEach(c=>{
   paletteDiv.appendChild(div)
 })
 
-// still keep manual Save button for backup
+// manual save (backup)
 document.getElementById("save").addEventListener("click", async ()=>{
   let table={}
   for(let y=0;y<size;y++){
@@ -80,16 +81,29 @@ document.getElementById("save").addEventListener("click", async ()=>{
   alert("Saved manually!")
 })
 
-// load
-document.getElementById("load").addEventListener("click", async ()=>{
-  const res = await fetch("/paint/load")
-  if(!res.ok){ alert("No save found"); return }
-  const table = await res.json()
-  for(let y in table){
-    for(let x in table[y]){
-      pixels[y-1][x-1] = table[y][x]
+// auto-load / sync across pages
+async function autoLoad() {
+  try {
+    const res = await fetch("/paint/load")
+    if(res.ok){
+      const table = await res.json()
+      let changed = false
+      for(let y in table){
+        for(let x in table[y]){
+          let newColor = table[y][x]
+          if(pixels[y-1][x-1] !== newColor){
+            pixels[y-1][x-1] = newColor
+            changed = true
+          }
+        }
+      }
+      if(changed) drawCanvas()
     }
-  }
-  drawCanvas()
-  alert("Loaded!")
-})
+  } catch(e){ console.warn("Failed to load:", e) }
+}
+
+// poll every 250ms
+setInterval(autoLoad, 250)
+
+// initial load on page open
+autoLoad()
