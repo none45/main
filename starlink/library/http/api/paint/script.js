@@ -23,22 +23,24 @@ let loadInterval
 // --- MOUSE EVENTS ---
 canvas.addEventListener("mousedown", e=>{
   drawing = true
-  clearInterval(loadInterval) // pause auto-load while drawing
+  clearInterval(loadInterval)
 })
 
-canvas.addEventListener("mouseup", async e=>{
+canvas.addEventListener("mouseup", e=>{
   drawing = false
-  await pushChanges()
-  localChanges = {}
-  startAutoLoad()
+  pushChanges().then(()=>{
+    localChanges = {}
+    startAutoLoad()
+  })
 })
 
 canvas.addEventListener("mouseleave", e=>{
   if(drawing){
     drawing = false
-    await pushChanges()
-    localChanges = {}
-    startAutoLoad()
+    pushChanges().then(()=>{
+      localChanges = {}
+      startAutoLoad()
+    })
   }
 })
 
@@ -48,11 +50,8 @@ canvas.addEventListener("mousemove", e=>{
   const x = Math.floor((e.clientX - rect.left)/scale)
   const y = Math.floor((e.clientY - rect.top)/scale)
   if(x>=0 && y>=0 && x<size && y<size){
-    // update local canvas immediately
     pixels[y][x] = currentColor
     drawCanvas()
-
-    // track only changed pixels
     if(!localChanges[y+1]) localChanges[y+1]={}
     localChanges[y+1][x+1] = currentColor
   }
@@ -70,15 +69,13 @@ paletteColors.forEach(c=>{
 })
 
 // --- PUSH ONLY LOCAL CHANGES ---
-async function pushChanges(){
-  if(Object.keys(localChanges).length===0) return
-  try{
-    await fetch("/paint/save", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify(localChanges)
-    })
-  }catch(e){ console.warn("Failed to push changes:", e) }
+function pushChanges(){
+  if(Object.keys(localChanges).length===0) return Promise.resolve()
+  return fetch("/paint/save",{
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(localChanges)
+  }).catch(e=>console.warn("Failed to push changes:", e))
 }
 
 // --- AUTO-LOAD ---
@@ -113,7 +110,7 @@ startAutoLoad()
 
 // --- RESET CANVAS BUTTON ---
 const resetBtn = document.getElementById("reset")
-resetBtn.addEventListener("click", async ()=>{
+resetBtn.addEventListener("click", ()=>{
   drawing = true
   clearInterval(loadInterval)
   localChanges = {}
@@ -127,8 +124,9 @@ resetBtn.addEventListener("click", async ()=>{
   }
 
   drawCanvas()
-  await pushChanges()
-  localChanges={}
-  drawing=false
-  startAutoLoad()
+  pushChanges().then(()=>{
+    localChanges={}
+    drawing=false
+    startAutoLoad()
+  })
 })
