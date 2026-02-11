@@ -6,7 +6,7 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(express.json())
-app.use(express.static(path.join(process.cwd(), 'paint')))
+app.use('/paint', express.static(path.join(process.cwd(), 'paint')))
 
 let latestState = { value: 0, timestamp: Date.now() }
 
