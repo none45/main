@@ -6,9 +6,11 @@ const size = 64
 let currentColor = "#FF0000FF"
 
 let pixels = Array.from({length:size},()=>Array(size).fill("#FFFFFFFF"))
-let localChanges = {}
 let drawing = false
+
+let localChanges = {}
 let pushing = false
+let needsAnotherPush = false
 
 function drawPixel(x,y,color){
   ctx.fillStyle = color
@@ -76,13 +78,17 @@ paletteColors.forEach(c=>{
 // ---------------- PUSH SYSTEM ----------------
 
 async function pushChanges(){
-  if(pushing) return
-  if(Object.keys(localChanges).length===0) return
+  if(pushing){
+    needsAnotherPush = true
+    return
+  }
 
-  pushing=true
+  if(Object.keys(localChanges).length === 0) return
+
+  pushing = true
 
   const payload = JSON.stringify(localChanges)
-  localChanges={}
+  localChanges = {}
 
   try{
     await fetch("/paint/save",{
@@ -91,16 +97,22 @@ async function pushChanges(){
       body:payload
     })
   }catch(e){
-    console.warn("push failed, retrying")
-    const failed=JSON.parse(payload)
+    console.warn("push failed, restoring changes")
+    const failed = JSON.parse(payload)
     for(let y in failed){
-      if(!localChanges[y]) localChanges[y]={}
-      Object.assign(localChanges[y],failed[y])
+      if(!localChanges[y]) localChanges[y] = {}
+      Object.assign(localChanges[y], failed[y])
     }
   }
 
-  pushing=false
+  pushing = false
+
+  if(needsAnotherPush){
+    needsAnotherPush = false
+    pushChanges()
+  }
 }
+
 
 function forcePush(){
   pushChanges()
