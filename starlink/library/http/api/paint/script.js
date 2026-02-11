@@ -4,10 +4,8 @@ const scale = 8
 const size = 64
 let currentColor = "#FF0000FF"
 
-// main pixel table
 let pixels = Array.from({length:size}, () => Array(size).fill("#FFFFFFFF"))
 
-// draw the full canvas
 function drawCanvas(){
   for(let y=0;y<size;y++){
     for(let x=0;x<size;x++){
@@ -18,18 +16,29 @@ function drawCanvas(){
 }
 drawCanvas()
 
-// track local changes while drawing
 let drawing = false
-let localChanges = {} // {row:{col:"#RRGGBBAA"}}
+let localChanges = {}
+let loadInterval
 
 // mouse events
-canvas.addEventListener("mousedown", e=>drawing=true)
+canvas.addEventListener("mousedown", e=>{
+  drawing=true
+  clearInterval(loadInterval) // pause auto-load completely
+})
 canvas.addEventListener("mouseup", async e=>{
   drawing=false
-  await pushChanges()
+  await pushChanges()       // push only local changes
   localChanges={}
+  startAutoLoad()            // resume auto-load
 })
-canvas.addEventListener("mouseleave", e=>drawing=false)
+canvas.addEventListener("mouseleave", e=>{
+  if(drawing){
+    drawing=false
+    pushChanges()
+    localChanges={}
+    startAutoLoad()
+  }
+})
 canvas.addEventListener("mousemove", e=>{
   if(!drawing) return
   const rect = canvas.getBoundingClientRect()
@@ -54,7 +63,7 @@ paletteColors.forEach(c=>{
   paletteDiv.appendChild(div)
 })
 
-// send only local changes to server
+// push local changes to server
 async function pushChanges(){
   if(Object.keys(localChanges).length===0) return
   try{
@@ -66,9 +75,8 @@ async function pushChanges(){
   }catch(e){ console.warn("Failed to push changes:", e) }
 }
 
-// auto-load from server for live sync
+// auto-load function
 async function autoLoad(){
-  if(drawing) return // pause while user draws
   try{
     const res = await fetch("/paint/load")
     if(!res.ok) return
@@ -87,8 +95,11 @@ async function autoLoad(){
   }catch(e){ console.warn("Auto-load failed:", e) }
 }
 
-// poll every 250ms
-setInterval(autoLoad, 250)
+// start auto-load interval
+function startAutoLoad(){
+  loadInterval = setInterval(autoLoad, 250)
+}
 
-// initial load on page open
+// initial load
 autoLoad()
+startAutoLoad()
