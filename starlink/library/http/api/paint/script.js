@@ -22,6 +22,7 @@ drawCanvas()
 let drawing = false
 canvas.addEventListener("mousedown", e => drawing = true)
 canvas.addEventListener("mouseup", e => drawing = false)
+canvas.addEventListener("mouseleave", e => drawing = false)
 canvas.addEventListener("mousemove", e => {
   if (!drawing) return
   const rect = canvas.getBoundingClientRect()
@@ -34,9 +35,9 @@ canvas.addEventListener("mousemove", e => {
 })
 
 // color palette
-const palette = ["#FF0000FF","#00FF00FF","#0000FFFF","#FFFFFFFF","#000000FF","#FFFF00FF"]
+const paletteColors = ["#FF0000FF","#00FF00FF","#0000FFFF","#FFFFFFFF","#000000FF","#FFFF00FF"]
 const paletteDiv = document.getElementById("palette")
-palette.forEach(c=>{
+paletteColors.forEach(c=>{
   const div = document.createElement("div")
   div.className="color"
   div.style.backgroundColor=c
@@ -65,7 +66,12 @@ document.getElementById("save").addEventListener("click",async ()=>{
 document.getElementById("load").addEventListener("click", async ()=>{
   const res = await fetch("/paint/load")
   if(!res.ok){ alert("No save found"); return }
-  const text = await res.text()
-  // eval the Lua table? For simplicity, reload JSON if you want Lua later
-  alert("Saved Lua table is on the server. Reloading requires parsing.")
+  const table = await res.json()
+  for(let y in table){
+    for(let x in table[y]){
+      pixels[y-1][x-1] = table[y][x]
+    }
+  }
+  drawCanvas()
+  alert("Loaded!")
 })
