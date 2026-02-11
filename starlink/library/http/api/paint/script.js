@@ -1,16 +1,10 @@
-<div id="palette"></div>
-<canvas id="canvas" width="512" height="512"></canvas>
-<button id="reset">Reset Canvas</button>
-
-<script>
 const canvas = document.getElementById("canvas")
 const ctx = canvas.getContext("2d")
 const scale = 8
 const size = 64
 let currentColor = "#FF0000FF"
 
-// main pixel table
-let pixels = Array.from({length:size}, ()=>Array(size).fill("#FFFFFFFF"))
+let pixels = Array.from({length:size}, () => Array(size).fill("#FFFFFFFF"))
 drawCanvas()
 
 function drawCanvas(){
@@ -23,27 +17,27 @@ function drawCanvas(){
 }
 
 let drawing = false
-let localChanges = {} // only pixels user drew
+let localChanges = {}
 let loadInterval
 
-// --- mouse events ---
+// --- MOUSE EVENTS ---
 canvas.addEventListener("mousedown", e=>{
-  drawing=true
+  drawing = true
   clearInterval(loadInterval) // pause auto-load while drawing
 })
 
 canvas.addEventListener("mouseup", async e=>{
-  drawing=false
+  drawing = false
   await pushChanges()
-  localChanges={}
-  startAutoLoad() // resume auto-load after push finishes
+  localChanges = {}
+  startAutoLoad()
 })
 
 canvas.addEventListener("mouseleave", e=>{
   if(drawing){
-    drawing=false
-    pushChanges()
-    localChanges={}
+    drawing = false
+    await pushChanges()
+    localChanges = {}
     startAutoLoad()
   }
 })
@@ -54,59 +48,42 @@ canvas.addEventListener("mousemove", e=>{
   const x = Math.floor((e.clientX - rect.left)/scale)
   const y = Math.floor((e.clientY - rect.top)/scale)
   if(x>=0 && y>=0 && x<size && y<size){
+    // update local canvas immediately
     pixels[y][x] = currentColor
     drawCanvas()
-    if(!localChanges[y+1]) localChanges[y+1] = {}
+
+    // track only changed pixels
+    if(!localChanges[y+1]) localChanges[y+1]={}
     localChanges[y+1][x+1] = currentColor
   }
 })
 
-// --- color palette ---
+// --- COLOR PALETTE ---
 const paletteColors = ["#FF0000FF","#00FF00FF","#0000FFFF","#FFFFFFFF","#000000FF","#FFFF00FF"]
 const paletteDiv = document.getElementById("palette")
 paletteColors.forEach(c=>{
   const div = document.createElement("div")
-  div.className="color"
+  div.className = "color"
   div.style.backgroundColor = c
   div.addEventListener("click", ()=>currentColor = c)
   paletteDiv.appendChild(div)
 })
 
-// --- reset canvas ---
-const resetBtn = document.getElementById("reset")
-resetBtn.addEventListener("click", async ()=>{
-  drawing=true
-  clearInterval(loadInterval)
-  localChanges={}
-  for(let y=0;y<size;y++){
-    for(let x=0;x<size;x++){
-      pixels[y][x]="#FFFFFFFF"
-      if(!localChanges[y+1]) localChanges[y+1]={}
-      localChanges[y+1][x+1]="#FFFFFFFF"
-    }
-  }
-  drawCanvas()
-  await pushChanges()
-  localChanges={}
-  drawing=false
-  startAutoLoad()
-})
-
-// --- push only local changes to server ---
+// --- PUSH ONLY LOCAL CHANGES ---
 async function pushChanges(){
   if(Object.keys(localChanges).length===0) return
   try{
-    await fetch("/paint/save",{
-      method:"POST",
+    await fetch("/paint/save", {
+      method: "POST",
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify(localChanges)
     })
   }catch(e){ console.warn("Failed to push changes:", e) }
 }
 
-// --- auto-load from server ---
+// --- AUTO-LOAD ---
 async function autoLoad(){
-  if(drawing) return // safety check
+  if(drawing) return // skip loading while drawing
   try{
     const res = await fetch("/paint/load")
     if(!res.ok) return
@@ -125,7 +102,7 @@ async function autoLoad(){
   }catch(e){ console.warn("Auto-load failed:", e) }
 }
 
-// --- start/pause auto-load ---
+// --- START AUTO-LOAD ---
 function startAutoLoad(){
   loadInterval = setInterval(autoLoad, 250)
 }
@@ -133,4 +110,25 @@ function startAutoLoad(){
 // initial load
 autoLoad()
 startAutoLoad()
-</script>
+
+// --- RESET CANVAS BUTTON ---
+const resetBtn = document.getElementById("reset")
+resetBtn.addEventListener("click", async ()=>{
+  drawing = true
+  clearInterval(loadInterval)
+  localChanges = {}
+
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      pixels[y][x] = "#FFFFFFFF"
+      if(!localChanges[y+1]) localChanges[y+1]={}
+      localChanges[y+1][x+1] = "#FFFFFFFF"
+    }
+  }
+
+  drawCanvas()
+  await pushChanges()
+  localChanges={}
+  drawing=false
+  startAutoLoad()
+})
